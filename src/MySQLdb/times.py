@@ -100,16 +100,11 @@ def TimeDelta_or_None(s):
             ms = ms.ljust(6, "0")
         else:
             ms = 0
-        if h[0] == "-":
-            negative = True
-        else:
-            negative = False
+
+        negative = True if h[0] == "-" else False
         h, m, s, ms = abs(int(h)), int(m), int(s), int(ms)
         td = timedelta(hours=h, minutes=m, seconds=s, microseconds=ms)
-        if negative:
-            return -td
-        else:
-            return td
+        return -td if negative else td
     except ValueError:
         # unpacking or int/float conversion failed
         return None

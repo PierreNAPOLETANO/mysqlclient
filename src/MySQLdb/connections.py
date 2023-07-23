@@ -160,17 +160,11 @@ class Connection(_mysql.connection):
         if "passwd" in kwargs2:
             kwargs2["password"] = kwargs2.pop("passwd")
 
-        if "conv" in kwargs:
-            conv = kwargs["conv"]
-        else:
-            conv = conversions
+        conv = kwargs["conv"] if "conv" in kwargs else conversions
 
         conv2 = {}
         for k, v in conv.items():
-            if isinstance(k, int) and isinstance(v, list):
-                conv2[k] = v[:]
-            else:
-                conv2[k] = v
+            conv2[k] = if isinstance(k, int) and isinstance(v, list) v[:] else v
         kwargs2["conv"] = conv2
 
         cursorclass = kwargs2.pop("cursorclass", self.default_cursor)
@@ -223,8 +217,7 @@ class Connection(_mysql.connection):
             self.converter[FIELD_TYPE.JSON] = str
 
         self._transactional = self.server_capabilities & CLIENT.TRANSACTIONS
-        if self._transactional:
-            if autocommit is not None:
+        if self._transactional and autocommit is not None:
                 self.autocommit(autocommit)
         self.messages = []
 

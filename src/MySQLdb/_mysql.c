@@ -106,15 +106,7 @@ _mysql_Exception(_mysql_ConnectionObject *c)
     int merr;
 
     if (!(t = PyTuple_New(2))) return NULL;
-    if (!(c->open)) {
-        /* GH-270: When connection is closed, accessing the c->connection
-         * object may cause SEGV.
-         */
-        merr = CR_SERVER_GONE_ERROR;
-    }
-    else {
-        merr = mysql_errno(&(c->connection));
-    }
+    merr = !(c->open) ? CR_SERVER_GONE_ERROR : mysql_errno(&(c->connection));
     switch (merr) {
     case 0:
         e = _mysql_InterfaceError;
@@ -198,10 +190,7 @@ _mysql_Exception(_mysql_ConnectionObject *c)
         e = _mysql_NotSupportedError;
         break;
     default:
-        if (merr < 1000)
-            e = _mysql_InternalError;
-        else
-            e = _mysql_OperationalError;
+        e = merr < 1000 ? _mysql_InternalError : _mysql_OperationalError;
         break;
     }
     PyTuple_SET_ITEM(t, 0, PyLong_FromLong((long)merr));
@@ -263,11 +252,8 @@ _mysql_ResultObject_Initialize(
     self->conn = (PyObject *) conn;
     Py_INCREF(conn);
     self->use = use;
-    Py_BEGIN_ALLOW_THREADS ;
-    if (use)
-        result = mysql_use_result(&(conn->connection));
-    else
-        result = mysql_store_result(&(conn->connection));
+    Py_BEGIN_ALLOW_THREADS;
+    result = use ? mysql_use_result(&(conn->connection)) : mysql_store_result(&(conn->connection);
     self->result = result;
     self->has_next = (char)mysql_more_results(&(conn->connection));
     Py_END_ALLOW_THREADS ;
@@ -365,11 +351,9 @@ static int _mysql_ResultObject_traverse(
     void *arg)
 {
     int r;
-    if (self->converter) {
-        if (!(r = visit(self->converter, arg))) return r;
-    }
-    if (self->conn)
-        return visit(self->conn, arg);
+
+    if (self->converter && !(r = visit(self->converter, arg))) return r;
+    if (self->conn) return visit(self->conn, arg);
     return 0;
 }
 
@@ -475,11 +459,9 @@ _mysql_ConnectionObject_Initialize(
         _stringsuck(key, value, ssl);
         _stringsuck(cipher, value, ssl);
     }
-    if (ssl_mode) {
-        if ((ssl_mode_num = _get_ssl_mode_num(ssl_mode)) <= 0) {
-            PyErr_SetString(_mysql_NotSupportedError, "Unknown ssl_mode specification");
-            return -1;
-        }
+    if (ssl_mode && (ssl_mode_num = _get_ssl_mode_num(ssl_mode)) <= 0) {
+        PyErr_SetString(_mysql_NotSupportedError, "Unknown ssl_mode specification");
+        return -1;
     }
 
     conn = mysql_init(&(self->connection));
@@ -1122,11 +1104,7 @@ _mysql_ResultObject_describe(
     for (i=0; i<n; i++) {
         PyObject *t;
         PyObject *name;
-        if (self->encoding == utf8) {
-            name = PyUnicode_DecodeUTF8(fields[i].name, fields[i].name_length, "replace");
-        } else {
-            name = PyUnicode_Decode(fields[i].name, fields[i].name_length, self->encoding, "replace");
-        }
+        name = self->encoding == utf8 ? PyUnicode_DecodeUTF8(fields[i].name, fields[i].name_length, "replace") : PyUnicode_Decode(fields[i].name, fields[i].name_length, self->encoding, "replace");
         if (name == NULL) {
             goto error;
         }
@@ -1189,13 +1167,7 @@ _mysql_field_to_python(
 
     // Fast paths for int, string and binary.
     if (converter == (PyObject*)&PyUnicode_Type) {
-        if (encoding == utf8) {
-            //fprintf(stderr, "decoding with utf8!\n");
-            return PyUnicode_DecodeUTF8(rowitem, length, NULL);
-        } else {
-            //fprintf(stderr, "decoding with %s\n", encoding);
-            return PyUnicode_Decode(rowitem, length, encoding, NULL);
-        }
+        return encoding == utf8 ? PyUnicode_DecodeUTF8(rowitem, length, NULL) : PyUnicode_Decode(rowitem, length, encoding, NULL);
     }
     if (converter == (PyObject*)&PyBytes_Type || converter == Py_None) {
         //fprintf(stderr, "decoding with bytes\n", encoding);
@@ -1336,11 +1308,7 @@ _mysql_row_to_dict_old(
         }
 
         PyObject *pyname;
-        if (strlen(fields[i].table)) {
-            pyname = PyUnicode_FromFormat("%s.%s", fields[i].table, fields[i].name);
-        } else {
-            pyname = PyUnicode_FromString(fields[i].name);
-        }
+        pyname = strlen(fields[i].table) ? PyUnicode_FromFormat("%s.%s", fields[i].table, fields[i].name) : pyname = PyUnicode_FromString(fields[i].name);
         int err = PyDict_SetItem(r, pyname, v);
         Py_DECREF(v);
         if (cache) {
@@ -2789,10 +2757,7 @@ _mysql_NewException(
     char *name)
 {
     PyObject *e;
-    if (!(e = PyDict_GetItemString(edict, name)))
-        return NULL;
-    if (PyDict_SetItemString(dict, name, e))
-        return NULL;
+    if (!(e = PyDict_GetItemString(edict, name)) || PyDict_SetItemString(dict, name, e)) return NULL;
     Py_INCREF(e);
     return e;
 }
@@ -2833,10 +2798,7 @@ PyInit__mysql(void)
         return NULL;
     }
 
-    if (PyType_Ready(&_mysql_ConnectionObject_Type) < 0)
-        return NULL;
-    if (PyType_Ready(&_mysql_ResultObject_Type) < 0)
-        return NULL;
+    if (PyType_Ready(&_mysql_ConnectionObject_Type) < 0 || PyType_Ready(&_mysql_ResultObject_Type) < 0) return NULL;
 
     module = PyModule_Create(&_mysqlmodule);
     if (!module) return module; /* this really should never happen */

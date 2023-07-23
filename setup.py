@@ -148,11 +148,7 @@ def get_options():
     options["static"] = enabled(options, "static")
     return options
 
-
-if sys.platform == "win32":
-    ext_options = get_config_win32(get_options())
-else:
-    ext_options = get_config_posix(get_options())
+ext_options = get_config_win32(get_options()) if sys.platform == "win32" else get_config_posix(get_options())
 
 print("# Options for building extension module:")
 for k, v in ext_options.items():

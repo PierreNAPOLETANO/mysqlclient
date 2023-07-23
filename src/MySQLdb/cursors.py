@@ -134,10 +134,8 @@ class BaseCursor:
 
     def _do_get_result(self, db):
         self._result = result = self._get_result()
-        if result is None:
-            self.description = self.description_flags = None
-        else:
-            self.description = result.describe()
+        self.description = self.description_flags = None if result is None else result.describe()
+        if result is not None:
             self.description_flags = result.field_flags()
 
         self.rowcount = db.affected_rows()
@@ -388,10 +386,7 @@ class CursorStoreResultMixIn:
     def fetchall(self):
         """Fetches all available rows from the cursor."""
         self._check_executed()
-        if self.rownumber:
-            result = self._rows[self.rownumber :]
-        else:
-            result = self._rows
+        result = self._rows[self.rownumber :] if self.rownumber else self._rows
         self.rownumber = len(self._rows)
         return result
 
